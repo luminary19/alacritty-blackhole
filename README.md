@@ -46,12 +46,14 @@ Alacritty window ◄──(click-through, no-activate, topmost GL overlay)──
 
 ## Schedule (replaces upstream's 55+5 pomodoro)
 
-The hole is invisible until **4 hours** of continuous work
+The hole is invisible until **3 hours** of continuous work
 (`GROW_AFTER_MIN`), then quickly grows to full size over **5 minutes**
-(`GROW_RAMP_MIN`) and stays. A **10-minute** typing pause
-(`IDLE_RESET_MIN`) fades it to invisible (the last `IDLE_FADE_SEC` of the
-pause is the fade) and resets the session — the next 4-hour cycle starts
-when you resume. Short pauses under 10 minutes don't reset anything.
+(`GROW_RAMP_MIN`) and stays. Once fully grown, animation time slows to
+`DILATION_MIN` of real speed — gravitational time dilation. A **10-minute**
+typing pause (`IDLE_RESET_MIN`) fades it to invisible (the last
+**60 seconds**, `IDLE_FADE_SEC`, of the pause is the fade) and resets the
+session — the next 3-hour cycle starts when you resume. Short pauses under
+10 minutes don't reset anything.
 
 ## Install / run
 
@@ -68,12 +70,13 @@ the mutex keeps extra windows from spawning duplicates.
 
 ## Tuning
 
-`python tune.py` (same keys as upstream: j/k select, h/l nudge, H/L coarse,
-s set exact, q quit). Notable knobs in `blackhole.glsl`:
+`python tune.py` (keys: j/k select, h/l nudge, H/L coarse, s set exact,
+r force reload, q quit). Notable knobs in `blackhole.glsl`:
 
 - `HOLE_RADIUS`, `LENS_STRENGTH`, `DISK_GAIN`, `DISK_TILT`, `DRIFT_SPEED`
+- `DILATION_MIN` — animation time rate once the hole is fully grown
 - `WORK_AREA` — bottom screen fraction kept undistorted
-- `GROW_AFTER_MIN` / `GROW_RAMP_MIN` — hours-until-visible / growth ramp
+- `GROW_AFTER_MIN` / `GROW_RAMP_MIN` — minutes-until-visible / growth ramp
 - `IDLE_RESET_MIN` / `IDLE_FADE_SEC` — pause that resets the session / fade length
 - `TIME_SCALE` — set to e.g. 100 to fast-forward the session for testing
 
@@ -89,6 +92,6 @@ before a manual edit to the shader will clobber that edit on its next save
 - The overlay only shows while Alacritty is the foreground window; alt-tab
   away and it hides.
 - If the hole is invisible: you probably haven't hit `GROW_AFTER_MIN`
-  (4 h) of continuous work yet, or a ≥ 10-minute pause reset the session.
+  (3 h) of continuous work yet, or a ≥ 10-minute pause reset the session.
   Check progress in `%LOCALAPPDATA%\alacritty-blackhole-session.json`
   (`start_epoch` is when the current session began).
