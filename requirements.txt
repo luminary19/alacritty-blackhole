@@ -1,0 +1,4 @@
+moderngl>=5.10
+glfw>=2.7
+numpy>=2.0
+windows-capture>=1.4
