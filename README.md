@@ -28,23 +28,7 @@ Alacritty window ◄──(click-through, no-activate, topmost GL overlay)──
 - **test_smoke.py / test_screenshot.py** — sanity checks: headless shader
   compile + capture probe; WGC monitor screenshot (overlays included).
 
-## Uniform emulation
-
-| Ghostty uniform     | This port                                            |
-|---------------------|------------------------------------------------------|
-| `iChannel0`         | live WGC capture of the Alacritty window             |
-| `iResolution/iTime` | overlay framebuffer size / monotonic clock           |
-| `iDate`             | wall clock                                           |
-| `iTimeCursorChange` | `GetLastInputInfo` — system-wide last keyboard/mouse |
-|                     | activity, closest native analogue to Ghostty's       |
-|                     | typing detector (idle ⇒ the hole fades away)         |
-| `iWorkSeconds`      | **new** — continuous work seconds this session,      |
-|                     | tracked by the overlay (shaders are stateless),      |
-|                     | persisted to `%LOCALAPPDATA%\alacritty-blackhole-`   |
-|                     | `session.json` across restarts; a ≥ `IDLE_RESET_MIN` |
-|                     | pause zeroes it                                      |
-
-## Schedule (replaces upstream's 55+5 pomodoro)
+## Schedule (3 hours work + 10 minute break)
 
 The hole is invisible until **3 hours** of continuous work
 (`GROW_AFTER_MIN`), then quickly grows to full size over **5 minutes**
