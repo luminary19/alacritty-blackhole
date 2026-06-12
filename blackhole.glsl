@@ -25,7 +25,7 @@ const float LENS_STRENGTH = 0.2600;  // Einstein radius at full intensity — ho
 const float DISK_GAIN     = 1.0000;  // accretion disk brightness
 const float DRIFT_SPEED   = 1.0000;   // how fast the hole floats around
 const float DISK_TILT     = 0.5000; // disk tilt, radians
-const float WORK_AREA     = 0.3400; // bottom screen fraction kept undistorted
+const float WORK_AREA     = 0.0000; // bottom screen fraction kept undistorted
 const float DILATION_MIN  = 0.1000; // animation time rate when the hole is fully grown (gravitational time dilation)
 
 // --------------------------------------------------- work session, overlay-fed --
@@ -36,7 +36,7 @@ const float DILATION_MIN  = 0.1000; // animation time rate when the hole is full
 // work, then ramps to full size over GROW_RAMP_MIN and stays until the next
 // reset. A pause fades it out smoothly, hitting invisible exactly when the
 // pause becomes a reset — after which the 4-hour clock starts over.
-const float GROW_AFTER_MIN = 240.0000; // continuous work before the hole appears
+const float GROW_AFTER_MIN = 180.0000; // continuous work before the hole appears
 const float GROW_RAMP_MIN  = 5.0000; // growth ramp once it appears
 const float IDLE_RESET_MIN = 10.0000; // typing pause that resets the session
 const float IDLE_FADE_SEC  = 60.0000; // fade-out length, ending at the reset
