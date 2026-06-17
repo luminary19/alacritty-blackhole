@@ -14,6 +14,10 @@
 //   * accretion disk         — Keplerian streaks, doppler beaming (approaching
 //     side blue-white and bright, receding side dim orange-red), plus a faint
 //     circular "lensed image" of the disk's far side
+//   * signal degradation     — as the hole grows the terminal "feed" breaks
+//     down old-tv style: defocus blur, grainy static snow, scanlines,
+//     vignette/flicker and a rolling band. It shares the hole's exact grow and
+//     idle-fade timing and its WORK_AREA exemption (tuned via CRT_* below).
 //
 // Ghostty setup (~/.config/ghostty/config):
 //   custom-shader = /path/to/blackhole_ghostty/blackhole.glsl
@@ -27,6 +31,20 @@ const float DRIFT_SPEED   = 1.0000;   // how fast the hole floats around
 const float DISK_TILT     = 0.5000; // disk tilt, radians
 const float WORK_AREA     = 0.0000; // bottom screen fraction kept undistorted
 const float DILATION_MIN  = 0.1000; // animation time rate when the hole is fully grown (gravitational time dilation)
+
+// ----------------------------------------- signal degradation (old-tv CRT) --
+// A grainy breakdown that grows in lockstep with the hole: it scales by the
+// same intensity I, fades on the same idle pause, and respects the same
+// WORK_AREA band as the lens warp. By full mass the terminal is defocused,
+// snowed over, scanlined and dimmed at the edges — barely legible — then a
+// desynced bright band rolls down it. All zero out until the hole appears.
+const float CRT_BLUR       = 0.0110; // defocus radius at full mass (fraction of screen height)
+const float CRT_STATIC     = 0.5500; // static-snow mix at full mass (1.0 = pure snow)
+const float CRT_SCANLINE   = 0.1800; // scanline darkening depth
+const float CRT_VIGNETTE   = 0.6000; // corner darkening at full mass
+const float CRT_FLICKER    = 0.0600; // global brightness flicker amount
+const float CRT_ROLL       = 0.1200; // rolling-band brightness
+const float CRT_ROLL_SPEED = 0.0800; // rolling-band scroll rate (screens/sec)
 
 // --------------------------------------------------- work session, overlay-fed --
 // "Reset after a break" needs memory, which a stateless shader doesn't have,
@@ -59,6 +77,21 @@ float vnoise(vec2 p) {
 
 // mirrored repeat keeps lensed samples on-screen without edge smearing
 vec2 mirrorUV(vec2 u) { return 1.0 - abs(1.0 - mod(u, 2.0)); }
+
+// 12-tap unit disk (two rings) for the CRT defocus blur
+const vec2 BLUR_DISK[12] = vec2[12](
+    vec2( 0.0000,  0.5000), vec2( 0.4330,  0.2500), vec2( 0.4330, -0.2500),
+    vec2( 0.0000, -0.5000), vec2(-0.4330, -0.2500), vec2(-0.4330,  0.2500),
+    vec2( 0.0000,  1.0000), vec2( 0.8660,  0.5000), vec2( 0.8660, -0.5000),
+    vec2( 0.0000, -1.0000), vec2(-0.8660, -0.5000), vec2(-0.8660,  0.5000)
+);
+
+// per-pixel, per-frame static snow; the time seed is wrapped so it stays
+// precise (and the snow keeps churning) even hours into a session
+float staticNoise(vec2 fc, float t) {
+    float fseed = mod(floor(t * 60.0), 1024.0);
+    return hash21(fc + vec2(fseed * 1.7, fseed * 3.1));
+}
 
 vec2 rot(vec2 v, float a) {
     float c = cos(a), s = sin(a);
@@ -107,6 +140,14 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float sz     = mix(0.22, 1.0, I);      // pops in small, swells through the ramp
     float rh     = HOLE_RADIUS * sz;
     float thetaE = LENS_STRENGTH * sz;
+
+    // CRT signal-degradation envelope: same intensity (I) and visibility gate
+    // (vis) as the hole, faded toward the work area exactly like the lens warp
+    // below. Every CRT effect scales by this one master amount, so the whole
+    // breakdown appears, grows and idle-fades on the hole's timing.
+    float crtMask = smoothstep(WORK_AREA, WORK_AREA + 0.18, yUp);
+    float crtAmt  = I * vis * crtMask;
+    float crtBlur = CRT_BLUR * crtAmt;
 
     // smooth animation runs off iTime (advances every frame); the wall clock
     // above only drives the slow pomodoro envelope
@@ -160,6 +201,24 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         term[i]   = texture(iChannel0, suv)[i];
     }
 
+    // ---- CRT defocus: the terminal goes soft as the hole grows ----
+    // blur the lensed terminal with a 12-tap disk around the (green) sample,
+    // averaged with the sharp center; collapses back to sharp when crtBlur is 0
+    if (crtBlur > 0.0) {
+        vec2 base = p - dir * defl;            // green-channel lensed position
+        vec3 blur = term;                      // include the sharp center tap
+        for (int j = 0; j < 12; j++) {
+            vec2 suv = mirrorUV(center + (base + BLUR_DISK[j] * crtBlur)
+                                / vec2(aspect, 1.0));
+            blur += texture(iChannel0, suv).rgb;
+        }
+        term = blur / 13.0;
+    }
+
+    // ---- static snow: grayscale grain washes over the terminal feed ----
+    // applied before the shadow mask, so the hole still eats the snow near it
+    term = mix(term, vec3(staticNoise(fragCoord, iTime)), CRT_STATIC * crtAmt);
+
     // shadow: hard black inside the horizon, text fades as it falls in
     float shadow = smoothstep(rh, rh * 1.03, r);
     term *= shadow * smoothstep(rh, rh * 1.5, r);
@@ -211,6 +270,27 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     // faint warm ambient glow so the hole reads as an object, not a cutout
     col += vec3(1.0, 0.55, 0.25) * 0.030 * exp(-pow(r / (rh * 3.5), 2.0)) * shadow * vis;
+
+    // ---- CRT post: scanlines, vignette, flicker, rolling band ----
+    // applied to the whole composited image (hole included) so it reads as one
+    // failing signal; all of it scales by crtAmt, so it shares the hole's
+    // timing and stays clear of the WORK_AREA band
+    if (crtAmt > 0.0) {
+        // fine horizontal scanlines
+        float scan  = 1.0 - CRT_SCANLINE * crtAmt
+                      * (0.5 + 0.5 * sin(fragCoord.y * 3.14159265));
+        // vignette: corners close in
+        vec2  vc    = uv - 0.5;
+        float vig   = 1.0 - CRT_VIGNETTE * crtAmt * dot(vc, vc) * 3.0;
+        // slow global brightness wobble
+        float flick = 1.0 + CRT_FLICKER * crtAmt
+                      * (vnoise(vec2(iTime * 7.0, 0.0)) - 0.5) * 2.0;
+        col *= scan * clamp(vig, 0.0, 1.0) * flick;
+        // desynced bright band scrolling down the screen
+        float band  = exp(-pow((fract(uv.y + iTime * CRT_ROLL_SPEED) - 0.5)
+                               / 0.05, 2.0));
+        col += band * CRT_ROLL * crtAmt;
+    }
 
     fragColor = vec4(col, 1.0);
 }
